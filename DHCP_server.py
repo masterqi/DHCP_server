@@ -42,6 +42,7 @@ class DHCP_server(object):
             if len(i) == 2:
                 if 'client_id' in i:
                     discover_mac = binascii.hexlify(i[1])
+                    chaddr = discover_mac[2:]
                     discover_mac = discover_mac[2:4] + ':' + discover_mac[4:6] + ':' +discover_mac[5:8] +':' +discover_mac[8:10] + ':' +\
                                    discover_mac[10:12] + ':' +discover_mac[12:]
                     discover_mac = discover_mac.upper()
@@ -65,6 +66,8 @@ class DHCP_server(object):
                 offer_packet[s.UDP].sport = packet[s.UDP].dport
                 offer_packet[s.BOOTP].xid = packet[s.BOOTP].xid
                 offer_packet[s.BOOTP].op = 'BOOTREPLY'
+                chaddr = chaddr + '00000000000000000000'
+                offer_packet[s.BOOTP].chaddr = binascii.unhexlify(chaddr)
                
                 for i in packet[s.DHCP].options:
                     if len(i) == 2:
@@ -133,14 +136,14 @@ class DHCP_server(object):
                 c = self.ip_stop.rfind('.')
                 d = int(self.ip_stop[c+1:]) + 1
                 if b < min(d, 255):
-                    offer_ip_last_1 = self.offer_ip_last[0:a] + ':' + ('%d' % b)
+                    offer_ip_last_1 = self.offer_ip_last[0:a] + '.' + ('%d' % b)
                 else:
                     list_ip = 0
                     offer_ip_last_1 = ''
                 if offer_ip_last_1 in self.offer_ip_list:
                     self.offer_ip_last = offer_ip_last_1
                 else:
-                    liset_ip = 0
+                    list_ip = 0
                     self.offer_ip_last = offer_ip_last_1
             if len(offer_ip_last_1):
                 return self.offer_ip_last
@@ -174,6 +177,7 @@ class DHCP_server(object):
             if len(i) == 2:
                 if 'client_id' in i:
                     request_mac = binascii.hexlify(i[1])
+                    chaddr = request_mac[2:]
                     request_mac = request_mac[2:4] + ':' + request_mac[4:6] + ':' +request_mac[5:8] +':' +request_mac[8:10] + ':' +\
                                    request_mac[10:12] + ':' +request_mac[12:]
                     request_mac = request_mac.upper()
@@ -196,14 +200,14 @@ class DHCP_server(object):
                 elif 'param_req_list' in i:
                     req_req_list = binascii.hexlify(i[1])
                     req_req_list_int = []
-                    c = len(req_list)
+                    c = len(req_req_list)
                     c = c/2
-                    for j in range(0,c):
+                    for j in range(1,c):
                         x = j - 1
-                        y = int(req_list[x*2:j*2], 16)
+                        y = int(req_req_list[x*2:j*2], 16)
                         req_req_list_int.append(y)
                 else:
-                    pass
+                    pass                   
         if ack_nck:
             self.offer_ip_list.append(request_ip)
             d = {}
@@ -217,8 +221,10 @@ class DHCP_server(object):
             ack_packet[s.UDP].dport = packet[s.UDP].sport
             ack_packet[s.BOOTP].xid = packet[s.BOOTP].xid
             ack_packet[s.BOOTP].yiaddr = request_ip
-            ack_packet[s.DHCP].options = slef.req_options(req_req_list_int, 5)
-            sendp(ack_packet, count=1)
+            chaddr = chaddr + '00000000000000000000'
+            ack_packet[s.BOOTP].chaddr = binascii.unhexlify(chaddr)
+            ack_packet[s.DHCP].options = self.req_options(req_req_list_int, 5)
+            s.sendp(ack_packet, count=1)
         else:
             nak_packet = s.Ether()/s.IP()/s.UDP()/s.BOOTP()/s.DHCP()
             nak_packet[s.Ether].dst = packet[s.Ether].src
